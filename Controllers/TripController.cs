@@ -1,16 +1,11 @@
 using System;
-using System.Text;
 using System.IO;
 using System.Text.RegularExpressions;
 
 
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System.Collections;
-using System.Collections.Generic;
 
 
 namespace TripAPI.Controllers
@@ -155,6 +150,7 @@ namespace TripAPI.Controllers
 
     public abstract class Compiler
     {
+
         public static void executeDriverCommand(int lineNumber, string[] currentLineSplit, List<Driver> drivers)
         {
             if (currentLineSplit.Length != 2)
@@ -167,7 +163,8 @@ namespace TripAPI.Controllers
 
         public static void invalidNumberOfArguments(int lineNumber, string command)
         {
-            badRequest(lineNumber, "Command " + command + " is invalid.");
+            int numOfArgs = command == "Driver" ? 1 : 4;
+            badRequest(lineNumber, "Invalid number of arguments for " + command + ". Expected " + numOfArgs + " arguments.");
         }
 
         public static IActionResult badRequest(int lineNumber, string message)
@@ -232,13 +229,6 @@ namespace TripAPI.Controllers
         {
         }
 
-
-        [HttpGet]
-        public string Get()
-        {
-            return "TESTER";
-        }
-
         [HttpPost("uploadAndCompile")]
         public async Task<IActionResult> compileFile()
         {
@@ -255,24 +245,36 @@ namespace TripAPI.Controllers
                 using (var reader = new StreamReader(file.OpenReadStream()))
                 {
                     int lineNumber = 0;
+                    int tripCount = 0;
                     while (reader.Peek() >= 0)
                     {
                         lineNumber++;
                         var currentLine = await reader.ReadLineAsync();
-                        string[] currentLineSplit = currentLine.Split(' ');
-                        string currentCommand = currentLineSplit.First();
-                        if (currentCommand == "Driver")
+
+                        if (currentLine != "")
                         {
-                            Compiler.executeDriverCommand(lineNumber, currentLineSplit, drivers);
+                            string[] currentLineSplit = currentLine.Split(' ');
+                            string currentCommand = currentLineSplit[0];
+                            if (currentCommand == "Driver")
+                            {
+                                Compiler.executeDriverCommand(lineNumber, currentLineSplit, drivers);
+                            }
+                            else if (currentCommand == "Trip")
+                            {
+                                tripCount++;
+                                Compiler.executeTripCommand(lineNumber, currentLineSplit, drivers);
+                            }
+                            else
+                            {
+                                Compiler.badRequest(lineNumber, "Command " + currentCommand + " is invalid.");
+                            }
+
                         }
-                        else if (currentCommand == "Trip")
-                        {
-                            Compiler.executeTripCommand(lineNumber, currentLineSplit, drivers);
-                        }
-                        else
-                        {
-                            Compiler.badRequest(lineNumber, "Command " + currentCommand + " is invalid.");
-                        }
+                    }
+
+                    if (tripCount == 0)
+                    {
+                        Compiler.badRequest(0, "No trip command has been called");
                     }
                 }
 
@@ -299,7 +301,7 @@ namespace TripAPI.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex);
+                return BadRequest(ex.Message);
             }
 
 
